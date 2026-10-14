@@ -49,16 +49,20 @@
     var isIOS = /iphone|ipad|ipod/.test(ua);
     var enc = encodeURIComponent(target);
 
-    // 안드로이드: intent 스킴으로 크롬(외부 브라우저) 강제 실행 → 인앱 웹뷰 탈출
+    // 안드로이드: intent 스킴으로 인앱 웹뷰 탈출.
+    // 기본은 '기기 기본 브라우저'로 열고(package 미지정), ?force=chrome 이면 크롬 강제.
+    var forceChrome = params.get("force") === "chrome";
     var hostAndRest = target.replace(/^https?:\/\//, "");
     var intentUrl =
       "intent://" + hostAndRest +
-      "#Intent;scheme=https;package=com.android.chrome;" +
+      "#Intent;scheme=https;" +
+      (forceChrome ? "package=com.android.chrome;" : "") +
       "S.browser_fallback_url=" + enc + ";end";
 
-    // 디버그: 어떤 분기를 탔는지 화면에 표시(테스트 편의)
+    // 디버그: 어떤 분기/모드를 탔는지 화면에 표시(테스트 편의)
     document.getElementById("dbg").textContent =
-      (isAndroid ? "ANDROID" : isIOS ? "iOS" : "WEB") + " · target=" + target;
+      (isAndroid ? "ANDROID(" + (forceChrome ? "chrome" : "default-browser") + ")" : isIOS ? "iOS" : "WEB") +
+      " · target=" + target;
 
     function showFallback(href) {
       document.getElementById("fallbackLink").setAttribute("href", href);
