@@ -4,40 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex" />
-  <title>링크 열기</title>
+  <title>이동 중…</title>
   <style>
-    :root { --primary:#4b7bec; --line:#e6e8eb; --ink:#222; --sub:#888; }
     html, body { height:100%; margin:0; }
     body {
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
-      color:var(--ink); padding:24px; box-sizing:border-box; background:#fafbfc;
+      color:#222; padding:24px; box-sizing:border-box; background:#fafbfc; text-align:center;
     }
-    .card {
-      width:100%; max-width:360px; background:#fff; border:1px solid var(--line);
-      border-radius:16px; padding:24px 20px; box-shadow:0 4px 16px rgba(0,0,0,.04); text-align:center;
+    .spinner {
+      width:32px; height:32px; border:3px solid #eee; border-top-color:#4b7bec;
+      border-radius:50%; animation:spin .8s linear infinite; margin-bottom:16px;
     }
-    h1 { font-size:18px; margin:0 0 6px; }
-    p.desc { font-size:14px; color:var(--sub); margin:0 0 20px; }
-    .btn {
-      display:block; width:100%; box-sizing:border-box; padding:15px 16px; margin:10px 0;
-      border-radius:10px; font-size:16px; font-weight:600; text-decoration:none; cursor:pointer;
-      border:1px solid var(--line); background:#fff; color:var(--ink);
-    }
-    .btn.primary { background:var(--primary); color:#fff; border-color:var(--primary); }
-    .target { font-size:12px; color:#b5bbc2; margin-top:16px; word-break:break-all; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    h1 { font-size:17px; margin:0 0 8px; font-weight:600; }
+    .target { font-size:12px; color:#b5bbc2; margin-top:14px; word-break:break-all; max-width:320px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>어떻게 열까요?</h1>
-    <p class="desc">원하는 방식을 선택해주세요.</p>
-
-    <a id="extBtn" class="btn primary" href="#">외부 브라우저에서 열기</a>
-    <a id="inAppBtn" class="btn" href="#">인스타그램에서 바로보기</a>
-
-    <div class="target" id="target"></div>
-  </div>
+  <div class="spinner"></div>
+  <h1>잠시 후 이동합니다…</h1>
+  <div class="target" id="target"></div>
 
   <script>
   (function () {
@@ -45,32 +32,53 @@
     var DEFAULT_TARGET = "https://www.coupang.com/vp/products/6731245116";
     var params = new URLSearchParams(location.search);
     var target = params.get("url") || DEFAULT_TARGET;
+    document.getElementById("target").textContent = target;
 
     var ua = navigator.userAgent.toLowerCase();
     var isAndroid = /android/.test(ua);
+    var isIOS = /iphone|ipad|ipod/.test(ua);
     var enc = encodeURIComponent(target);
 
-    // [외부 브라우저에서 열기]
-    // - Android: intent 스킴으로 인앱 웹뷰 탈출(App Links 앱 있으면 앱, 없으면 기본 브라우저)
-    //            ?force=chrome 이면 크롬 강제
-    // - iOS/기타: 사용자가 직접 탭하는 제스처로 목적지 이동(인앱의 외부열기 동작 유도)
-    var forceChrome = params.get("force") === "chrome";
-    var hostAndRest = target.replace(/^https?:\/\//, "");
-    var intentUrl =
-      "intent://" + hostAndRest + "#Intent;scheme=https;" +
-      (forceChrome ? "package=com.android.chrome;" : "") +
-      "S.browser_fallback_url=" + enc + ";end";
-
-    var extBtn = document.getElementById("extBtn");
-    extBtn.setAttribute("href", isAndroid ? intentUrl : target);
-
-    // [인스타그램에서 바로보기] - 현재 인앱 브라우저 안에서 그대로 열기
-    document.getElementById("inAppBtn").addEventListener("click", function (e) {
-      e.preventDefault();
+    // 자동 탈출 실패(앱 미설치/인앱 브라우저의 스킴 차단) 시,
+    // 인스타그램 인앱 브라우저 안에서 목적지로 랜딩시키는 폴백
+    var fallbackTimer = setTimeout(function () {
       location.replace(target);
-    });
+    }, 2200);
 
-    document.getElementById("target").textContent = target;
+    // 외부 앱(크롬/기본 브라우저)이 떠서 페이지가 백그라운드로 가면 폴백 취소
+    function cancelFallback() {
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) cancelFallback();
+    });
+    window.addEventListener("pagehide", cancelFallback);
+
+    try {
+      if (isAndroid) {
+        // 기본 브라우저로 탈출(package 미지정 → 기본 브라우저/검증된 App Links 앱).
+        // 미처리 시 intent 내부 browser_fallback_url 로 인앱 랜딩.
+        var hostAndRest = target.replace(/^https?:\/\//, "");
+        var intentUrl =
+          "intent://" + hostAndRest + "#Intent;scheme=https;" +
+          "S.browser_fallback_url=" + enc + ";end";
+        location.href = intentUrl;
+      } else if (isIOS) {
+        // 크롬 설치 시 크롬으로 탈출(https→googlechromes). 미설치면 타이머가 인앱 랜딩 처리.
+        var chromeScheme = target
+          .replace(/^https:\/\//, "googlechromes://")
+          .replace(/^http:\/\//, "googlechrome://");
+        location.href = chromeScheme;
+      } else {
+        // PC/기타: 곧바로 목적지로
+        cancelFallback();
+        location.replace(target);
+      }
+    } catch (e) {
+      // 스킴 호출 자체가 실패하면 즉시 인앱 랜딩
+      cancelFallback();
+      location.replace(target);
+    }
   })();
   </script>
 </body>
