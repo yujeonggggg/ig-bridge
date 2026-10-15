@@ -32,6 +32,9 @@
     var DEFAULT_TARGET = "https://www.coupang.com/vp/products/6731245116";
     var params = new URLSearchParams(location.search);
     var target = params.get("url") || DEFAULT_TARGET;
+    // ?url= 가 없거나 http(s) 형식이 아니면(플레이스홀더를 그대로 붙여넣는 등)
+    // 멈추지 않도록 기본값으로 대체
+    if (!/^https?:\/\//i.test(target)) target = DEFAULT_TARGET;
     document.getElementById("target").textContent = target;
 
     var ua = navigator.userAgent.toLowerCase();
