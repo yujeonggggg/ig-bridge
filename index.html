@@ -32,8 +32,7 @@
     var DEFAULT_TARGET = "https://www.coupang.com/vp/products/6731245116";
     var params = new URLSearchParams(location.search);
     var target = params.get("url") || DEFAULT_TARGET;
-    // ?url= 가 없거나 http(s) 형식이 아니면(플레이스홀더를 그대로 붙여넣는 등)
-    // 멈추지 않도록 기본값으로 대체
+    // ?url= 가 없거나 http(s) 형식이 아니면(플레이스홀더를 그대로 붙여넣는 등) 기본값으로
     if (!/^https?:\/\//i.test(target)) target = DEFAULT_TARGET;
     document.getElementById("target").textContent = target;
 
@@ -42,46 +41,39 @@
     var isIOS = /iphone|ipad|ipod/.test(ua);
     var enc = encodeURIComponent(target);
 
-    // 자동 탈출 실패(앱 미설치/인앱 브라우저의 스킴 차단) 시,
-    // 인스타그램 인앱 브라우저 안에서 목적지로 랜딩시키는 폴백
-    var fallbackTimer = setTimeout(function () {
-      location.replace(target);
-    }, 2200);
-
-    // 외부 앱(크롬/기본 브라우저)이 떠서 페이지가 백그라운드로 가면 폴백 취소
-    function cancelFallback() {
-      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-    }
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden) cancelFallback();
-    });
-    window.addEventListener("pagehide", cancelFallback);
-
-    try {
-      if (isAndroid) {
-        // 기본 브라우저로 탈출(package 미지정 → 기본 브라우저/검증된 App Links 앱).
-        // 미처리 시 intent 내부 browser_fallback_url 로 인앱 랜딩.
-        var hostAndRest = target.replace(/^https?:\/\//, "");
-        var intentUrl =
-          "intent://" + hostAndRest + "#Intent;scheme=https;" +
-          "S.browser_fallback_url=" + enc + ";end";
-        location.href = intentUrl;
-      } else if (isIOS) {
-        // 크롬 설치 시 크롬으로 탈출(https→googlechromes). 미설치면 타이머가 인앱 랜딩 처리.
-        var chromeScheme = target
-          .replace(/^https:\/\//, "googlechromes://")
-          .replace(/^http:\/\//, "googlechrome://");
-        location.href = chromeScheme;
+    if (isAndroid) {
+      // 인앱 브라우저는 자동 intent 탈출이 막히는 경우가 많아,
+      // 확인창(얼럿) → 사용자 탭(제스처)으로 기본 브라우저를 실행한다.
+      var hostAndRest = target.replace(/^https?:\/\//, "");
+      var intentUrl =
+        "intent://" + hostAndRest + "#Intent;scheme=https;" +
+        "S.browser_fallback_url=" + enc + ";end";
+      if (window.confirm("기본 브라우저로 열까요?")) {
+        location.href = intentUrl;   // 기본 브라우저/검증된 App Links 앱 실행
       } else {
-        // PC/기타: 곧바로 목적지로
-        cancelFallback();
-        location.replace(target);
+        location.replace(target);    // 취소 시 인앱 브라우저에서 그대로 보기
       }
-    } catch (e) {
-      // 스킴 호출 자체가 실패하면 즉시 인앱 랜딩
-      cancelFallback();
-      location.replace(target);
+      return;
     }
+
+    if (isIOS) {
+      // 크롬 설치 시 크롬으로 탈출(https→googlechromes). 미설치/실패 시 폴백 타이머가 인앱 랜딩.
+      var chromeScheme = target
+        .replace(/^https:\/\//, "googlechromes://")
+        .replace(/^http:\/\//, "googlechrome://");
+      // 멈추지 않도록 폴백은 반드시 동작. '실제 페이지 이탈'(pagehide) 시에만 취소해 중복 이동 방지.
+      var fallbackTimer = setTimeout(function () {
+        location.replace(target);
+      }, 1500);
+      window.addEventListener("pagehide", function () {
+        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+      });
+      location.href = chromeScheme;
+      return;
+    }
+
+    // PC/기타: 곧바로 목적지로
+    location.replace(target);
   })();
   </script>
 </body>
