@@ -43,13 +43,16 @@
 
     if (isAndroid) {
       // 인앱 브라우저는 자동 intent 탈출이 막히는 경우가 많아,
-      // 확인창(얼럿) → 사용자 탭(제스처)으로 기본 브라우저를 실행한다.
+      // 확인창(얼럿) → 사용자 탭(제스처)으로 크롬을 실행한다.
+      // iOS 와 동일하게 '크롬'을 콕 집어 열어 목적지(쿠팡 등)의 봇 차단 통과율을 높인다.
+      // 크롬 미설치 기기는 browser_fallback_url 로 기본 브라우저 처리.
       var hostAndRest = target.replace(/^https?:\/\//, "");
       var intentUrl =
         "intent://" + hostAndRest + "#Intent;scheme=https;" +
+        "package=com.android.chrome;" +
         "S.browser_fallback_url=" + enc + ";end";
-      if (window.confirm("기본 브라우저로 열까요?")) {
-        location.href = intentUrl;   // 기본 브라우저/검증된 App Links 앱 실행
+      if (window.confirm("Chrome으로 열까요?")) {
+        location.href = intentUrl;   // 크롬 실행(미설치 시 fallback_url)
       } else {
         location.replace(target);    // 취소 시 인앱 브라우저에서 그대로 보기
       }
