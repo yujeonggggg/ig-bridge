@@ -41,21 +41,31 @@
     var ua = navigator.userAgent.toLowerCase();
     var isAndroid = /android/.test(ua);
     var isIOS = /iphone|ipad|ipod/.test(ua);
+    // 인스타/페북 인앱 브라우저 여부. 크롬 등 일반 브라우저로 다시 열리면 false.
+    var inApp = /instagram|fban|fbav|fb_iab/.test(ua);
+    // 크롬에서 다시 로드될 때 목적지로 쓸 '브릿지 자신'의 URL(=인스타 referer 세탁 경유지)
+    var selfUrl = location.origin + location.pathname + "?url=" + encodeURIComponent(target);
 
     if (isAndroid) {
-      // 묻지 않고 바로 크롬 실행 시도('크롬'을 콕 집어 열어 목적지 봇 차단 통과율↑).
-      // 크롬 미설치/실패 시 인스타그램 인앱 브라우저에서 그대로 랜딩(폴백 타이머).
-      var hostAndRest = target.replace(/^https?:\/\//, "");
-      var intentUrl =
-        "intent://" + hostAndRest + "#Intent;scheme=https;" +
-        "package=com.android.chrome;end";
-      var fallbackTimer = setTimeout(function () {
+      if (inApp) {
+        // 인스타 인앱 → 크롬으로 '브릿지 자신'을 다시 연다(인스타 referer 세탁용).
+        // 크롬에서 재로드되면 inApp=false 가 되어 아래 else 로 no-referrer 목적지 이동.
+        var hostAndRest = selfUrl.replace(/^https?:\/\//, "");
+        var intentUrl =
+          "intent://" + hostAndRest + "#Intent;scheme=https;" +
+          "package=com.android.chrome;end";
+        // 크롬 미설치/실패 시 인스타 인앱 브라우저에서 그대로 랜딩
+        var fallbackTimer = setTimeout(function () {
+          location.replace(target);
+        }, 1500);
+        window.addEventListener("pagehide", function () {
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        });
+        location.href = intentUrl;
+      } else {
+        // 이미 크롬/일반 브라우저 → no-referrer 로 목적지 이동(인스타 출처 제거됨)
         location.replace(target);
-      }, 1500);
-      window.addEventListener("pagehide", function () {
-        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-      });
-      location.href = intentUrl;   // 크롬 실행(미설치/실패 시 위 폴백이 인앱 랜딩)
+      }
       return;
     }
 
